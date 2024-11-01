@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Search System</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f4f4f4;
+        }
+        .container {
+            margin-top: 50px;
+        }
+        .form-container, .job-list-container {
+            background-color: white;
+            border-radius: 5px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #28a745; /* Green */
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #007bff; /* Blue */
+        }
+        .error-message {
+            color: red;
+            margin: 10px 0;
+        }
+        .job-item {
+            padding: 15px;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            background-color: #fff3cd; /* Light orange background */
+            margin-bottom: 10px;
+        }
+        .btn-primary {
+            background-color: #28a745; /* Green */
+            border: none;
+        }
+        .btn-primary:hover {
+            background-color: #218838; /* Darker green */
+        }
+        .btn-secondary {
+            background-color: #fd7e14; /* Orange */
+            border: none;
+        }
+        .btn-secondary:hover {
+            background-color: #e36b10; /* Darker orange */
+        }
+        .btn-success {
+            background-color: #28a745; /* Green */
+            border: none;
+        }
+        .btn-success:hover {
+            background-color: #218838; /* Darker green */
+        }
+        #loadingIndicator {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Job Search System</h1>
+
+    <div class="form-container">
+        <h2>Add a Job</h2>
+        <div class="form-group">
+            <label for="jobTitle">Title <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="jobTitle" placeholder="Job Title" required>
+        </div>
+        <div class="form-group">
+            <label for="jobDescription">Description <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="jobDescription" placeholder="Job Description" required></textarea>
+        </div>
+        <div class="form-group">
+            <label for="companyName">Company Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="companyName" placeholder="Company Name" required>
+        </div>
+        <div class="form-group">
+            <label for="location">Location <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="location" placeholder="Location" required>
+        </div>
+        <button class="btn btn-primary" onclick="addJob()">Add Job</button>
+        <div id="addJobError" class="error-message"></div>
+    </div>
+
+    <div class="form-container">
+        <h2>Search for Jobs</h2>
+        <div class="form-group">
+            <input type="text" class="form-control" id="searchKeyword" placeholder="Search by keyword">
+            <button class="btn btn-secondary mt-2" onclick="searchJobs()">Search</button>
+        </div>
+        <div id="jobList"></div>
+        <div id="loadingIndicator" class="text-center">Loading jobs...</div>
+    </div>
+</div>
+
+<script>
+    const apiUrl = 'http://localhost:8080/api/jobs';
+
+    async function addJob() {
+        const title = document.getElementById('jobTitle').value;
+        const description = document.getElementById('jobDescription').value;
+        const companyName = document.getElementById('companyName').value;
+        const location = document.getElementById('location').value;
+        const errorElement = document.getElementById('addJobError');
+
+        errorElement.textContent = ''; // Clear previous error messages
+
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ title, description, companyName, location, isApplied: false }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Error adding job');
+            }
+
+            alert('Job added successfully!');
+            clearForm();
+        } catch (error) {
+            errorElement.textContent = error.message;
+        }
+    }
+
+    async function searchJobs() {
+        const keyword = document.getElementById('searchKeyword').value;
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        loadingIndicator.style.display = 'block';
+
+        try {
+            const response = await fetch(`${apiUrl}/search?keyword=${keyword}`);
+
+            if (!response.ok) throw new Error('Error fetching jobs.');
+
+            const jobs = await response.json();
+            displayJobs(jobs);
+        } catch (error) {
+            alert(error.message);
+        } finally {
+            loadingIndicator.style.display = 'none';
+        }
+    }
+
+    function displayJobs(jobs) {
+        const jobList = document.getElementById('jobList');
+        jobList.innerHTML = '';
+
+        if (jobs.length === 0) {
+            jobList.innerHTML = '<p>No jobs found.</p>';
+            return;
+        }
+
+        jobs.forEach(job => {
+            const jobItem = document.createElement('div');
+            jobItem.className = 'job-item';
+            jobItem.innerHTML = `
+                <h5>${job.title}</h5>
+                <p>${job.description}</p>
+                <p><strong>Company:</strong> ${job.companyName}</p>
+                <p><strong>Location:</strong> ${job.location}</p>
+                <button class="btn btn-success" onclick="applyForJob(${job.id})">Apply</button>
+            `;
+            jobList.appendChild(jobItem);
+        });
+    }
+
+    async function applyForJob(id) {
+        try {
+            const response = await fetch(`${apiUrl}/${id}/apply`, {
+                method: 'POST',
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Error applying for job.');
+            }
+
+            alert('Applied successfully!');
+            searchJobs(); // Refresh job list
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    function clearForm() {
+        document.getElementById('jobTitle').value = '';
+        document.getElementById('jobDescription').value = '';
+        document.getElementById('companyName').value = '';
+        document.getElementById('location').value = '';
+    }
+</script>
+
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
